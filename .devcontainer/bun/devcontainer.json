@@ -8,7 +8,6 @@
     "vscode": {
       "settings": {},
       "extensions": [
-        "Codeium.codeium",
         "jetpack-io.devbox",
         "ms-vscode-remote.remote-ssh",
         "biomejs.biome",

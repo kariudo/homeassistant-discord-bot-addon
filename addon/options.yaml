@@ -1,0 +1,28 @@
+options:
+  BOT_TOKEN: <YOUR_BOT_TOKEN>
+  MQTT_URL: mqtt://192.168.1.110
+  MQTT_PORT: 1883
+  MQTT_USERNAME: mqttbotuser
+  MQTT_PASSWORD: <YOUR_MQTT_PASSWORD>
+  TOPIC_DISCOVERY: homeassistant
+  TOPIC_BOT: discordbot
+  GUILD_ID: <YOUR_GUILD_ID>
+  YOUR_ID: <YOUR_ID>
+  BOT_ID: <YOUR_BOT_ID>
+  MQTT_CLIENT_ID: discordbot_bow_1
+  BOT_ACTIVITY: "🏠Watching the house"
+  BOT_NICKNAME: Caduceus
+schema:
+  BOT_TOKEN: str
+  MQTT_URL: str
+  MQTT_PORT: int
+  MQTT_USERNAME: str
+  MQTT_PASSWORD: str
+  TOPIC_DISCOVERY: str
+  TOPIC_BOT: str
+  GUILD_ID: str
+  YOUR_ID: str
+  BOT_ID: str
+  MQTT_CLIENT_ID: str
+  BOT_ACTIVITY: str
+  BOT_NICKNAME: str

@@ -9,3 +9,6 @@ arch:
 url: "https://github.com/kariudo/homeassistant-discord-bot"
 startup: services
 image: ghcr.io/kariudo/homeassistant-discord-bot
+init: false
+services:
+  - mqtt:want

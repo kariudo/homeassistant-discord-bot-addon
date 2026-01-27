@@ -1,0 +1,275 @@
+name: Build and Publish Home Assistant Addon
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'addon/**'
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'Dockerfile'
+      - 'start.sh'
+      - '.github/workflows/addon-build.yml'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  addon-build:
+    name: Build Home Assistant Addon
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from addon config
+        id: version
+        run: |
+          VERSION=$(grep "^version:" addon/config.yaml | sed 's/version: "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Addon version: $VERSION"
+
+      - name: Extract version from Git tag
+        id: tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Git tag version: $VERSION"
+
+      - name: Validate version consistency
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          ADDON_VERSION=${{ steps.version.outputs.version }}
+          TAG_VERSION=${{ steps.tag.outputs.tag_version }}
+          if [ "$ADDON_VERSION" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "   Addon version: $ADDON_VERSION"
+            echo "   Git tag version: $TAG_VERSION"
+            echo "   Please ensure versions match before tagging."
+            exit 1
+          fi
+          echo "✅ Versions match: $ADDON_VERSION"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=addon-latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image for addon
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.version.outputs.version }}
+
+      - name: Generate addon metadata
+        id: addon_metadata
+        run: |
+          cat > addon-metadata.json << 'EOF'
+          {
+            "addon_name": "Home Assistant Discord Bot",
+            "slug": "homeassistant-discord-bot",
+            "version": "${{ steps.version.outputs.version }}",
+            "image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",
+            "build_time": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "git_commit": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "platforms": ["amd64", "arm64"],
+            "docker_image_digest": "${{ steps.docker_build.outputs.digest }}"
+          }
+          EOF
+          cat addon-metadata.json
+
+      - name: Upload addon metadata as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: addon-metadata-${{ steps.version.outputs.version }}
+          path: addon-metadata.json
+          retention-days: 90
+
+      - name: Create release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cat > RELEASE_NOTES.md << 'EOF'
+          # Home Assistant Discord Bot - Addon Release v${{ steps.version.outputs.version }}
+
+          ## Docker Image Information
+
+          **Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}`
+
+          **Supported Platforms:**
+          - `linux/amd64` (x86_64)
+          - `linux/arm64` (ARM 64-bit, e.g., Raspberry Pi 4)
+
+          **Image Digest:** `${{ steps.docker_build.outputs.digest }}`
+
+          ## Deployment Options
+
+          ### Home Assistant Addon
+          1. Add addon repository to Home Assistant
+          2. Install "Home Assistant Discord Bot"
+          3. Configure through Settings → Add-ons → Home Assistant Discord Bot
+          4. Click Start
+
+          ### Plain Docker
+          ```bash
+          docker run -d \
+            --name discord-bot \
+            -e BOT_TOKEN="your-token" \
+            -e MQTT_URL="mqtt://host" \
+            -e MQTT_USERNAME="user" \
+            -e MQTT_PASSWORD="pass" \
+            -e GUILD_ID="id" \
+            -e YOUR_ID="id" \
+            -e BOT_ID="id" \
+            -e TOPIC_BOT="discordbot" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          ```
+
+          ### Docker Compose
+          ```yaml
+          version: '3.8'
+          services:
+            discord-bot:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+              restart: unless-stopped
+              environment:
+                BOT_TOKEN: ${BOT_TOKEN}
+                MQTT_URL: ${MQTT_URL}
+                MQTT_USERNAME: ${MQTT_USERNAME}
+                MQTT_PASSWORD: ${MQTT_PASSWORD}
+                GUILD_ID: ${GUILD_ID}
+                YOUR_ID: ${YOUR_ID}
+                BOT_ID: ${BOT_ID}
+                TOPIC_BOT: discordbot
+          ```
+
+          ## What's New
+
+          See [CHANGELOG](CHANGELOG.md) or the commit history for detailed changes.
+
+          ## Configuration
+
+          ### Required Environment Variables
+          - `BOT_TOKEN` - Discord bot token
+          - `MQTT_URL` - MQTT broker URL
+          - `MQTT_USERNAME` - MQTT username
+          - `MQTT_PASSWORD` - MQTT password
+          - `GUILD_ID` - Discord server ID
+          - `YOUR_ID` - Your Discord user ID
+          - `BOT_ID` - Discord bot application ID
+          - `TOPIC_BOT` - MQTT bot topic prefix
+
+          ### Optional Environment Variables
+          - `MQTT_PORT` (default: 1883)
+          - `TOPIC_DISCOVERY` (default: homeassistant)
+          - `MQTT_CLIENT_ID` (default: discordbot_hass_1)
+          - `BOT_ACTIVITY` (default: 🏠 Watching the house)
+          - `BOT_NICKNAME` (default: Caduceus)
+
+          For more information, see the [documentation](00_START_HERE.md).
+
+          ## Build Information
+
+          - **Build Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - **Git Commit:** ${{ github.sha }}
+          - **Git Ref:** ${{ github.ref }}
+          - **GitHub Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          EOF
+          cat RELEASE_NOTES.md
+
+      - name: Upload release notes artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ steps.version.outputs.version }}
+          path: RELEASE_NOTES.md
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            addon-metadata.json
+            RELEASE_NOTES.md
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print build summary
+        if: always()
+        run: |
+          echo "## Build Summary"
+          echo "- **Status:** ${{ job.status }}"
+          echo "- **Version:** ${{ steps.version.outputs.version }}"
+          echo "- **Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+          echo "- **Platforms:** amd64, arm64"
+          echo "- **Digest:** ${{ steps.docker_build.outputs.digest }}"
+          echo "- **Artifact:** addon-metadata-${{ steps.version.outputs.version }}"
+          if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+            echo "- **Tag:** addon-latest"
+          fi
+
+      - name: Post to deployment channel
+        if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+        run: |
+          echo "✅ Addon build successful!"
+          echo ""
+          echo "### Deployment Information"
+          echo "- **Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}\`"
+          echo "- **Version:** ${{ steps.version.outputs.version }}"
+          echo "- **Platforms:** linux/amd64, linux/arm64"
+          echo ""
+          if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+            echo "**Latest tag:** \`addon-latest\`"
+            echo "**Branch:** master"
+          fi
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]; then
+            echo "**Release Tag:** ${{ github.ref_name }}"
+          fi

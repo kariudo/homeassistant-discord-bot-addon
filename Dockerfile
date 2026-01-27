@@ -31,5 +31,24 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/dist/index.js .
 COPY --from=prerelease /usr/src/app/package.json .
 
-# run the app
-ENTRYPOINT [ "bun", "run", "index.js" ]
+
+# Install jq for JSON parsing in run script
+RUN apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
+
+# Copy addon run script
+COPY addon/run.sh /
+RUN chmod +x /run.sh
+
+# Create app directory for the application files
+WORKDIR /app
+RUN mkdir -p /app/dist
+COPY --from=prerelease /usr/src/app/dist/index.js /app/dist/
+COPY --from=prerelease /usr/src/app/package.json /app/
+
+# Copy both start scripts - universal entry point will choose which to use
+COPY addon/run.sh /start-addon.sh
+COPY start.sh /start.sh
+RUN chmod +x /start.sh /start-addon.sh
+
+# Universal entrypoint that detects deployment mode
+ENTRYPOINT [ "/start.sh" ]

@@ -1,5 +1,5 @@
 name: "Home Assistant Discord Bot"
-version: "1.7.1"
+version: "v1.7.1"
 slug: homeassistant-discord-bot
 description: >-
   "The Home Assistant Discord Bot offers a pile of features designed to enhance your Discord experience by leveraging Home Assistant's capabilities via MQTT for lightweight communication and automatic setup of devices and entities."

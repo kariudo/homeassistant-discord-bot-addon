@@ -6,7 +6,7 @@ description: >-
 arch:
   - amd64
   - arm64
-url: "https://github.com/kariudo/homeassistant-discord-bot"
+url: "https://github.com/kariudo/homeassistant-discord-bot-addon"
 startup: services
 image: ghcr.io/kariudo/homeassistant-discord-bot
 init: false

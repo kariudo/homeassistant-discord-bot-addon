@@ -5,7 +5,7 @@ description: >-
   "The Home Assistant Discord Bot offers a pile of features designed to enhance your Discord experience by leveraging Home Assistant's capabilities via MQTT for lightweight communication and automatic setup of devices and entities."
 arch:
   - amd64
-  - arm64
+  - aarch64
 url: "https://github.com/kariudo/homeassistant-discord-bot-addon"
 startup: services
 image: ghcr.io/kariudo/homeassistant-discord-bot

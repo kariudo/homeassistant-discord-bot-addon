@@ -12,3 +12,77 @@ image: ghcr.io/kariudo/homeassistant-discord-bot
 init: false
 services:
   - mqtt:want
+options:
+  BOT_TOKEN: ""
+  MQTT_URL: "mqtt://localhost"
+  MQTT_PORT: 1883
+  MQTT_USERNAME: ""
+  MQTT_PASSWORD: ""
+  TOPIC_DISCOVERY: "homeassistant"
+  TOPIC_BOT: "discordbot"
+  GUILD_ID: ""
+  YOUR_ID: ""
+  BOT_ID: ""
+  MQTT_CLIENT_ID: "discordbot_hass_1"
+  BOT_ACTIVITY: "🏠 Watching the house"
+  BOT_NICKNAME: "Caduceus"
+
+schema:
+  BOT_TOKEN:
+    type: str
+    description: "Discord bot token (required)"
+    required: true
+  MQTT_URL:
+    type: str
+    description: "MQTT broker URL (e.g., mqtt://localhost or mqtt://192.168.1.110)"
+    required: true
+  MQTT_PORT:
+    type: int
+    description: "MQTT broker port"
+    required: false
+    default: 1883
+  MQTT_USERNAME:
+    type: str
+    description: "MQTT broker username (required)"
+    required: true
+  MQTT_PASSWORD:
+    type: str
+    description: "MQTT broker password (required)"
+    required: true
+  TOPIC_DISCOVERY:
+    type: str
+    description: "MQTT discovery topic prefix"
+    required: false
+    default: "homeassistant"
+  TOPIC_BOT:
+    type: str
+    description: "MQTT bot topic prefix"
+    required: false
+    default: "discordbot"
+  GUILD_ID:
+    type: str
+    description: "Discord guild (server) ID (required)"
+    required: true
+  YOUR_ID:
+    type: str
+    description: "Your Discord user ID (required)"
+    required: true
+  BOT_ID:
+    type: str
+    description: "Discord bot application ID (required)"
+    required: true
+  MQTT_CLIENT_ID:
+    type: str
+    description: "MQTT client identifier"
+    required: false
+    default: "discordbot_hass_1"
+  BOT_ACTIVITY:
+    type: str
+    description: "Bot activity status message"
+    required: false
+    default: "🏠 Watching the house"
+  BOT_NICKNAME:
+    type: str
+    description: "Bot nickname in Discord"
+    required: false
+    default: "Caduceus"
